@@ -1,1 +1,1 @@
-# MnasNet Tensorflow2 Implementation
+# MnasNet Tensorflow 2 Implementation
