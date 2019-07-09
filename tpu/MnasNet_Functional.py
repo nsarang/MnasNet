@@ -36,6 +36,13 @@ GlobalParams = collections.namedtuple('GlobalParams', [
 GlobalParams.__new__.__defaults__ = (None, ) * len(GlobalParams._fields)
 
 
+# The input tensor is in the range of [0, 255], we need to scale them to the
+# range of [0, 1]
+MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
+STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
+
+
+
 def decode_block_string(block_string):
     """Gets a MNasNet block through a string notation of arguments.
     E.g. r2_k3_s2_e1_i32_o16_se0.25_noskip: r - number of repeat blocks,
@@ -245,8 +252,20 @@ def MnasNetModel(blocks_args, global_params):
     stem_size = global_params.stem_size
     data_format = global_params.data_format
 
-    # Stem part.
+    if data_format == 'channels_first':
+        stats_shape = [3, 1, 1]
+    else:
+        stats_shape = [1, 1, 3]
+
+    # Process input
     input_tensor = tf.keras.layers.Input(shape=global_params.input_shape)
+    # Normalize the image to zero mean and unit variance.
+    x = input_tensor
+    x -= tf.constant(MEAN_RGB, shape=stats_shape)
+    x /= tf.constant(STDDEV_RGB, shape=stats_shape)
+
+
+    # Stem part.
     x = tf.keras.layers.Conv2D(
         filters=round_filters(stem_size, global_params),
         kernel_size=[3, 3],
@@ -256,7 +275,7 @@ def MnasNetModel(blocks_args, global_params):
         use_bias=False,
         data_format=data_format,
         name='stem_conv',
-        )(input_tensor)
+        )(x)
     x = tf.keras.layers.BatchNormalization(axis=channel_axis,
             momentum=batch_norm_momentum, epsilon=batch_norm_epsilon,
             fused=True, name='stem_conv_BN')(x)
