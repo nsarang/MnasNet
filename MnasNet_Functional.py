@@ -26,12 +26,12 @@ GlobalParams = collections.namedtuple('GlobalParams', [
     'batch_norm_epsilon',
     'dropout_rate',
     'data_format',
+    'input_shape',
     'num_classes',
     'depth_multiplier',
     'depth_divisor',
     'min_depth',
     'stem_size',
-    'use_keras',
     ])
 GlobalParams.__new__.__defaults__ = (None, ) * len(GlobalParams._fields)
 
@@ -236,7 +236,7 @@ def MnasBlock(input_tensor, block_args, global_params, name):
     return x
 
 
-def MnasNetModel(input_tensor, blocks_args=None, global_params=None):
+def MnasNetModel(blocks_args, global_params):
 
     batch_norm_momentum = global_params.batch_norm_momentum
     batch_norm_epsilon = global_params.batch_norm_epsilon
@@ -246,6 +246,7 @@ def MnasNetModel(input_tensor, blocks_args=None, global_params=None):
     data_format = global_params.data_format
 
     # Stem part.
+    x = tf.keras.layers.Input(shape=global_params.input_shape)
     x = tf.keras.layers.Conv2D(
         filters=round_filters(stem_size, global_params),
         kernel_size=[3, 3],
@@ -255,7 +256,7 @@ def MnasNetModel(input_tensor, blocks_args=None, global_params=None):
         use_bias=False,
         data_format=data_format,
         name='conv_stem',
-        )(input_tensor)
+        )(x)
     x = tf.keras.layers.BatchNormalization(axis=channel_axis,
             momentum=batch_norm_momentum, epsilon=batch_norm_epsilon,
             fused=True, name='conv_stem_BN')(x)
@@ -336,12 +337,12 @@ def mnasnet_b1(depth_multiplier=None):
         batch_norm_epsilon=1e-3,
         dropout_rate=0.2,
         data_format='channels_last',
+        input_shape=(224, 224, 3),
         num_classes=1000,
         depth_multiplier=depth_multiplier,
         depth_divisor=8,
         min_depth=None,
-        stem_size=32,
-        use_keras=True,
+        stem_size=32
         )
     return (decoded_blocks, global_params)
 
@@ -370,12 +371,12 @@ def mnasnet_a1(depth_multiplier=None):
         batch_norm_epsilon=1e-3,
         dropout_rate=0.2,
         data_format='channels_last',
+        input_shape=(224, 224, 3),
         num_classes=1000,
         depth_multiplier=depth_multiplier,
         depth_divisor=8,
         min_depth=None,
-        stem_size=32,
-        use_keras=True,
+        stem_size=32
         )
 
     return (decoded_blocks, global_params)
