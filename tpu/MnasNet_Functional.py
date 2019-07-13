@@ -32,6 +32,7 @@ GlobalParams = collections.namedtuple('GlobalParams', [
     'depth_divisor',
     'min_depth',
     'stem_size',
+    'normalize_input'
     ])
 GlobalParams.__new__.__defaults__ = (None, ) * len(GlobalParams._fields)
 
@@ -258,12 +259,14 @@ def MnasNetModel(blocks_args, global_params):
         stats_shape = [1, 1, 3]
 
     # Process input
-    input_tensor = tf.keras.layers.Input(shape=global_params.input_shape)
+    input_tensor = tf.keras.layers.Input(shape=global_params.input_shape,
+                                         name='float_image_input')
     # Normalize the image to zero mean and unit variance.
     x = input_tensor
-    x -= tf.constant(MEAN_RGB, shape=stats_shape)
-    x /= tf.constant(STDDEV_RGB, shape=stats_shape)
-
+    if global_params.normalize_input:
+        x -= tf.constant(MEAN_RGB, shape=stats_shape)
+        x /= tf.constant(STDDEV_RGB, shape=stats_shape)
+        
 
     # Stem part.
     x = tf.keras.layers.Conv2D(
@@ -363,7 +366,8 @@ def mnasnet_b1(depth_multiplier=None):
         depth_multiplier=depth_multiplier,
         depth_divisor=8,
         min_depth=None,
-        stem_size=32
+        stem_size=32,
+        normalize_input=True
         )
     return (decoded_blocks, global_params)
 
@@ -397,7 +401,8 @@ def mnasnet_a1(depth_multiplier=None):
         depth_multiplier=depth_multiplier,
         depth_divisor=8,
         min_depth=None,
-        stem_size=32
+        stem_size=32,
+        normalize_input=True
         )
 
     return (decoded_blocks, global_params)
