@@ -32,8 +32,16 @@ GlobalParams = collections.namedtuple('GlobalParams', [
     'depth_divisor',
     'min_depth',
     'stem_size',
+    'normalize_input'
     ])
 GlobalParams.__new__.__defaults__ = (None, ) * len(GlobalParams._fields)
+
+
+# The input tensor is in the range of [0, 255], we need to scale them to the
+# range of [0, 1]
+MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
+STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
+
 
 
 def decode_block_string(block_string):
@@ -198,7 +206,7 @@ def MnasBlock(input_tensor, block_args, global_params, name):
             padding='same',
             use_bias=True,
             data_format=data_format,
-            name=name +'_se_reduce',
+            name=name +'_se_reduce_conv',
             )(se_tensor)
         se_tensor = tf.keras.layers.ReLU()(se_tensor)
         se_tensor = tf.keras.layers.Conv2D(
@@ -209,7 +217,7 @@ def MnasBlock(input_tensor, block_args, global_params, name):
             padding='same',
             use_bias=True,
             data_format=data_format,
-            name=name+'_se_expand',
+            name=name+'_se_expand_conv',
             )(se_tensor)
         x = tf.sigmoid(se_tensor) * x
 
@@ -245,8 +253,22 @@ def MnasNetModel(blocks_args, global_params):
     stem_size = global_params.stem_size
     data_format = global_params.data_format
 
+    if data_format == 'channels_first':
+        stats_shape = [3, 1, 1]
+    else:
+        stats_shape = [1, 1, 3]
+
+    # Process input
+    input_tensor = tf.keras.layers.Input(shape=global_params.input_shape,
+                                         name='float_image_input')
+    # Normalize the image to zero mean and unit variance.
+    x = input_tensor
+    if global_params.normalize_input:
+        x -= tf.constant(MEAN_RGB, shape=stats_shape)
+        x /= tf.constant(STDDEV_RGB, shape=stats_shape)
+        
+
     # Stem part.
-    x = tf.keras.layers.Input(shape=global_params.input_shape)
     x = tf.keras.layers.Conv2D(
         filters=round_filters(stem_size, global_params),
         kernel_size=[3, 3],
@@ -255,11 +277,11 @@ def MnasNetModel(blocks_args, global_params):
         padding='same',
         use_bias=False,
         data_format=data_format,
-        name='conv_stem',
+        name='stem_conv',
         )(x)
     x = tf.keras.layers.BatchNormalization(axis=channel_axis,
             momentum=batch_norm_momentum, epsilon=batch_norm_epsilon,
-            fused=True, name='conv_stem_BN')(x)
+            fused=True, name='stem_conv_BN')(x)
     x = tf.keras.layers.ReLU()(x)
 
     # Builds blocks.
@@ -293,11 +315,11 @@ def MnasNetModel(blocks_args, global_params):
         padding='same',
         use_bias=False,
         data_format=data_format,
-        name='conv_head',
+        name='head_conv',
         )(x)
     x = tf.keras.layers.BatchNormalization(axis=channel_axis,
             momentum=batch_norm_momentum, epsilon=batch_norm_epsilon,
-            fused=True, name='conv_head_BN')(x)
+            fused=True, name='head_conv_BN')(x)
     x = tf.keras.layers.ReLU()(x)
 
     x = tf.keras.layers.GlobalAveragePooling2D(data_format=data_format,
@@ -306,11 +328,13 @@ def MnasNetModel(blocks_args, global_params):
     if global_params.dropout_rate > 0:
         x = tf.keras.layers.Dropout(global_params.dropout_rate)(x)
 
-    x = tf.keras.layers.Dense(global_params.num_classes,
-                              kernel_initializer=dense_kernel_initializer,
-                              name='FC')(x)
+    output_fc = tf.keras.layers.Dense(
+        global_params.num_classes,
+        kernel_initializer=dense_kernel_initializer,
+        name='FC')(x)
 
-    return x
+    model = tf.keras.models.Model(inputs=input_tensor, outputs=output_fc)
+    return model
 
 
 def mnasnet_b1(depth_multiplier=None):
@@ -342,7 +366,8 @@ def mnasnet_b1(depth_multiplier=None):
         depth_multiplier=depth_multiplier,
         depth_divisor=8,
         min_depth=None,
-        stem_size=32
+        stem_size=32,
+        normalize_input=True
         )
     return (decoded_blocks, global_params)
 
@@ -376,7 +401,8 @@ def mnasnet_a1(depth_multiplier=None):
         depth_multiplier=depth_multiplier,
         depth_divisor=8,
         min_depth=None,
-        stem_size=32
+        stem_size=32,
+        normalize_input=True
         )
 
     return (decoded_blocks, global_params)
