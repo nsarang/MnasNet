@@ -331,9 +331,11 @@ def MnasNetModel(blocks_args, global_params):
     output_fc = tf.keras.layers.Dense(
         global_params.num_classes,
         kernel_initializer=dense_kernel_initializer,
-        name='FC')(x)
+        name='fully_connected')(x)
 
-    model = tf.keras.models.Model(inputs=input_tensor, outputs=output_fc)
+    output_softmax = tf.keras.layers.Softmax(name='softmax')(output_fc)
+
+    model = tf.keras.models.Model(inputs=input_tensor, outputs=output_softmax)
     return model
 
 
