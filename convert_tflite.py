@@ -37,7 +37,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Convert TF2 model to TFlite.')
     parser.add_argument('-t', '--type', choices=['savedmodel', 'tf_keras'],
                      help='type of input model', required=True)
-    parser.add_argument('-i', '--model-path', help='path to the model (depending on the specified type', required=True)
+    parser.add_argument('-i', '--model-path', help='path to the model (depending on the specified type)', required=True)
     parser.add_argument('-o', '--output-path', help='path to output tflite file', required=True)
     args = parser.parse_args()
     
@@ -51,7 +51,6 @@ if __name__ == '__main__':
     output = args.output_path
     if output.endswith('.tflite'):
         output = output[:-7]
-    print(output)
     
     # Convert the model.
     tflite_model = converter.convert()
